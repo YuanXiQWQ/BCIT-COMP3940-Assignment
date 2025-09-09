@@ -37,6 +37,31 @@ public class Trivia extends HttpServlet {
             // request
             System.out.println(request.getPathInfo());
             System.out.println(request.getParameterMap());
+            String op = request.getParameter("op");
+            if ("one".equals(op)) {
+                // Get a image from the images directory
+                String imagesDir = getServletContext().getRealPath("/images");
+                File dir = new File(imagesDir);
+                String url = "";
+
+                if (dir.exists() && dir.isDirectory()) {
+                    File[] files = dir.listFiles();
+                    if (files != null) {
+                        for (File f : files) {
+                            if (f.isFile() && !f.isHidden()) {
+                                url = request.getContextPath() + "/images/" + f.getName();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Return the image path
+                response.setContentType("text/plain; charset=UTF-8");
+                PrintWriter out = response.getWriter();
+                out.print(url);
+                return;
+            }
             //use the resource Values to find out the details of the request and
             // respond accordingly
             File dir = new File("c:\\tomcat\\webapps\\triviaapi\\images");
