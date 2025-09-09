@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<div id="login" style="display:block">
+  <label for="username">Username:</label><br>
+  <input type="text" id="username" name="username"/><br>
+  <label for="password">Password:</label><br>
+  <input type="text" id="password" name="password"/><br><br>
+   <button onclick="handleLogin()">login</button>
+</div>
+<div id="upload" style="display:none">
+ <p>Select a File:</p>
+<input type="file" id="myFileField" name="fileName" />
+ <button onclick="handleUpload()">Upload</buton>
+</div>
+<div id="index" style="display:block">
+ <p id="listView">List Files Here</p>
+ <button onclick="handleFileListing()">List</button>
+</div>
+</div>
+<div id="delete" style="display:block">
+ <button onclick="handleDelete()">Delete</button>
+</div>
+
+
+<script>
+function handleDelete() {
+   alert("Check the Tomcat Console Log to see if doDelete invoked");
+   const xhttp = new XMLHttpRequest();
+   xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("listView").innerHTML = this.responseText;
+    }
+  };
+   xhttp.open("Delete", "/triviaapi/trivia/Id=1");
+   xhttp.send();
+}
+function handleFileListing() {
+   const xhttp = new XMLHttpRequest();
+   xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("listView").innerHTML = this.responseText;
+    }
+  };
+   xhttp.open("GET", "/triviaapi/trivia/Id=1");
+   xhttp.send();
+}
+function handleLogin() {
+   const xhttp = new XMLHttpRequest();
+   xhttp.onload = function() {
+     document.getElementById("login").style.display = "none";
+     document.getElementById("upload").style.display = "block";
+   }
+   xhttp.open("POST", "/triviaapi/account?user_id=temp&password=12345");
+   xhttp.send();
+}
+function handleUpload() {
+   var formData = new FormData();
+   formData.append("caption", "Test File");
+   formData.append("date", "2020-10-10");
+   formData.append("fileName", document.getElementById("myFileField").files[0]);
+   const xhr = new XMLHttpRequest();
+   xhr.onload = function() {
+     alert("File Uploaded");   
+   }
+   xhr.open("POST", "/triviaapi/trivia");
+   xhr.send(formData);
+}
+</script>
+</body>
+</html>
