@@ -5,63 +5,89 @@ import java.sql.*;
 import java.io.*;
 
 public class PlayServlet extends HttpServlet {
+    private static final String JDBC_URL =
+            "jdbc:mysql://localhost:3306/testdb?useSSL=false&serverTimezone=UTC";
+    private static final String JDBC_USER = "root";
+    private static final String JDBC_PASS = "YOUR_PASSWORD";
+
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException
     {
-        String errMsg = "";
-        Connection con = null;
-        try
-        {
-            try
-            {
-                Class.forName("oracle.jdbc.OracleDriver");
-            } catch(Exception ex)
-            {
-            }
-            con = DriverManager.getConnection("jdbc:oracle:thin:@localhost:49732:XE",
-                    "system", "oracle1");
-            Statement stmt = con.createStatement();
-            ResultSet rs =
-                    stmt.executeQuery("select id, question, contentpath from trivias");
-            while(rs.next())
-            {
-                String content = rs.getString("contentpath");
+        response.setContentType("text/html; charset=UTF-8");
+        HttpSession session = request.getSession(true);
 
-            }
-            stmt.close();
-            con.close();
-        } catch(SQLException ex)
+        // Use session to record current video index (0-based)
+        Integer idx = (Integer) session.getAttribute("VID_IDX");
+        if(idx == null)
         {
-            errMsg = errMsg + "\n--- SQLException caught ---\n";
-            while(ex != null)
-            {
-                errMsg += "Message: " + ex.getMessage();
-                errMsg += "SQLState: " + ex.getSQLState();
-                errMsg += "ErrorCode: " + ex.getErrorCode();
-                ex = ex.getNextException();
-                errMsg += "";
-            }
+            idx = 0;
         }
-        String contentPath = "tgbNymZ7vqY";
-        response.setContentType("text/html");
+
+        // Move index based on button click
+        if(request.getParameter("prev") != null && idx > 0)
+        {
+            idx--;
+        } else if(request.getParameter("next") != null)
+        {
+            idx++;
+        }
+
+        // Get video URL from database
+        String videoUrl = null;
+        try(Connection con = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASS))
+        {
+            try(PreparedStatement ps = con.prepareStatement(
+                    "SELECT url FROM videos ORDER BY id LIMIT 1 OFFSET ?"))
+            {
+                ps.setInt(1, idx);
+                try(ResultSet rs = ps.executeQuery())
+                {
+                    if(rs.next())
+                    {
+                        videoUrl = rs.getString(1);
+                    }
+                }
+            }
+            if(videoUrl == null)
+            {
+                idx = 0;
+                try(PreparedStatement ps0 = con.prepareStatement(
+                        "SELECT url FROM videos ORDER BY id LIMIT 1 OFFSET 0");
+                    ResultSet rs0 = ps0.executeQuery())
+                {
+                    if(rs0.next())
+                    {
+                        videoUrl = rs0.getString(1);
+                    }
+                }
+            }
+        } catch(SQLException e)
+        {
+            // Never! Gonna! Give! You! Up!
+            videoUrl = "https://youtu.be/dQw4w9WgXcQ?si=959xB4npzjgrNRtK";
+        }
+
+        session.setAttribute("VID_IDX", idx);
+
         PrintWriter out = response.getWriter();
         out.println(
                 "<!DOCTYPE html>" +
+                        "<html>" +
                         "<meta charset='UTF-8'>" +
                         "<body>" +
                         "<div>" +
                         "<iframe id=\"Video\" width=\"420\" height=\"345\" " +
-                        "src=https://www.youtube.com/embed/" +
-                        contentPath + "?autoplay=1&mute=1&start=62&end=162>" +
+                        "src=" + videoUrl +
+                        ">" +
                         "</iframe>" +
                         "</div>" +
                         "<div>" +
                         "<form action='/trivia/play' method='GET'>" +
                         "<br>" +
                         "<div class='button'>" +
-                        "<button class='button' id='prev'>Prev</button>" +
-                        "<button class='button' id='next'>Next</button>" +
+                        "<button class='button' id='prev' name='prev'>Prev</button>" +
+                        "<button class='button' id='next' name='next'>Next</button>" +
                         "</div>" +
                         "<br>" +
                         "</form>" +
