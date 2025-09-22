@@ -1,13 +1,17 @@
 import java.io.*;
 import java.net.*;
+
 public class UploadClient {
-    public UploadClient() { }
-    public String uploadFile() {
+    public UploadClient() {}
+
+    public String uploadFile()
+    {
         String listing = "";
-        try {
+        try
+        {
             Socket socket = new Socket("localhost", 8999);
             BufferedReader in = new BufferedReader(
-                new InputStreamReader(socket.getInputStream()));
+                    new InputStreamReader(socket.getInputStream()));
             OutputStream out = socket.getOutputStream();
             FileInputStream fis = new FileInputStream("AndroidLogo.png");
             byte[] bytes = fis.readAllBytes();
@@ -16,11 +20,13 @@ public class UploadClient {
             fis.close();
             System.out.println("Came this far\n");
             String filename = "";
-            while ((filename = in.readLine()) != null) {
+            while((filename = in.readLine()) != null)
+            {
                 listing += filename;
             }
             socket.shutdownInput();
-        } catch (Exception e) {
+        } catch(Exception e)
+        {
             System.err.println(e);
         }
         return listing;
