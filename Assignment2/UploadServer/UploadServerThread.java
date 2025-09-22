@@ -27,6 +27,9 @@ public class UploadServerThread extends Thread {
         } catch(Exception e)
         {
             e.printStackTrace();
+        } finally
+        {
+            UploadServer.CONNECTION_SEM.release();
         }
     }
 }

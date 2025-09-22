@@ -1,7 +1,9 @@
 import java.net.*;
 import java.io.*;
+import java.util.concurrent.Semaphore;
 
 public class UploadServer {
+    static final Semaphore CONNECTION_SEM = new Semaphore(3, true);
     public static void main(String[] args) throws IOException
     {
         ServerSocket serverSocket = null;
@@ -15,7 +17,18 @@ public class UploadServer {
         }
         while(true)
         {
-            new UploadServerThread(serverSocket.accept()).start();
+            try {
+                CONNECTION_SEM.acquire();
+                try {
+                    Socket socket = serverSocket.accept();
+                    new UploadServerThread(socket).start();
+                } catch (Exception e) {
+                    CONNECTION_SEM.release();
+                    throw e;
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
