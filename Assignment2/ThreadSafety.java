@@ -1,5 +1,6 @@
 public class ThreadSafety implements Runnable {
     int shared = 0;
+    private boolean t2Completed = false;
 
     public static void main(String[] args)
     {
@@ -14,24 +15,38 @@ public class ThreadSafety implements Runnable {
     {
         synchronized(this)
         {
-            if(Thread.currentThread().getName().contains("T2"))
+            // T1 waits for T2 to complete first
+            if(Thread.currentThread().getName().equals("T1"))
             {
-                try
+                while(!t2Completed)
                 {
-                    this.wait();
-                } catch(InterruptedException e)
-                {
+                    try
+                    {
+                        this.wait();
+                    } catch(InterruptedException e)
+                    {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             }
+
             int copy = shared;
             try
             {
                 Thread.sleep((int) (Math.random() * 10000));
             } catch(InterruptedException e)
             {
+                Thread.currentThread().interrupt();
             }
             shared = copy + 1;
             System.out.println(Thread.currentThread().getName() + ": " + shared);
+
+            // After T2 finishes, signal T1 to proceed
+            if(Thread.currentThread().getName().equals("T2"))
+            {
+                t2Completed = true;
+                this.notifyAll();
+            }
         }
     }
 }
