@@ -14,6 +14,14 @@ public class Activity {
 
     public void onCreate()
     {
-        System.out.println(new UploadClient().uploadFile());
+        AsyncTask UploadAsyncTask = new UploadAsyncTask().execute();
+        System.out.println("Waiting for Callback");
+        try
+        {
+            BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+            br.readLine();
+        } catch(Exception e)
+        {
+        }
     }
 }
