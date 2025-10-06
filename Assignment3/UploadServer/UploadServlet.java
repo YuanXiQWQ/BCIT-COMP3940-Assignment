@@ -1,46 +1,71 @@
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.Semaphore;
+import java.util.*;
+import java.util.regex.Pattern;
 
 public class UploadServlet extends HttpServlet {
-    private static final Semaphore UPLOAD_SEM = new Semaphore(3, true);
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    {
+        try
+        {
+            String html;
+            File form = new File("Form.html");
+            if(form.exists())
+            {
+                html = readFileUTF8(form);
+            } else
+            {
+                html = "<!doctype html><html><head><meta " +
+                        "charset='utf-8'><title>Upload</title></head><body>" +
+                        "<h2>File Upload</h2>" + "<form method='POST' action='/' " +
+                        "enctype='multipart/form-data'>" +
+                        "Caption: <input type='text' name='caption'><br/><br/>" +
+                        "Date: <input type='date' name='date'><br/>" +
+                        "File: <input type='file' name='fileName'><br/><br/>" +
+                        "<input type='submit' value='Submit'>" + "</form></body></html>";
+            }
+            response.getOutputStream().write(html.getBytes(StandardCharsets.UTF_8));
+        } catch(Exception ex)
+        {
+            try
+            {
+                response.getOutputStream().write(("<pre>" + ex + "</pre>").getBytes(
+                        StandardCharsets.UTF_8));
+            } catch(IOException ignored)
+            {
+            }
+        }
+    }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
     {
         try
         {
-            File imagesDir = checkImagesDir();
-
             String contentType = request.getHeader("content-type");
-            if(contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT)
+            if(contentType == null || !contentType.toLowerCase(Locale.ROOT)
                     .startsWith("multipart/form-data"))
             {
-                String msg =
-                        "<!doctype html><meta charset='utf-8'><body>Unsupported " +
-                                "Content-Type</body>";
-                response.getOutputStream()
-                        .write(msg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                String msg = "<!doctype html><meta charset='utf-8'><body>Unsupported " +
+                        "Content-Type</body>";
+                response.getOutputStream().write(msg.getBytes(StandardCharsets.UTF_8));
                 return;
             }
             String boundary = extractBoundary(contentType);
             if(boundary == null)
             {
-                String msg =
-                        "<!doctype html><meta charset='utf-8'><body>Boundary not " +
-                                "found</body>";
-                response.getOutputStream()
-                        .write(msg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                String msg = "<!doctype html><meta charset='utf-8'><body>Boundary not " +
+                        "found</body>";
+                response.getOutputStream().write(msg.getBytes(StandardCharsets.UTF_8));
                 return;
             }
 
             byte[] bodyBytes = readAllBytes(request.getInputStream());
-
-            String bodyStr =
-                    new String(bodyBytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+            String bodyStr = new String(bodyBytes, StandardCharsets.ISO_8859_1);
             String delimiter = "--" + boundary;
-
-            String[] rawParts = bodyStr.split(java.util.regex.Pattern.quote(delimiter));
+            String[] rawParts = bodyStr.split(Pattern.quote(delimiter));
 
             String caption = "";
             String date = "";
@@ -67,7 +92,6 @@ public class UploadServlet extends HttpServlet {
 
                 String headerBlock = part.substring(0, headerEnd);
                 String content = part.substring(headerEnd + 4);
-
                 if(content.endsWith("\r\n"))
                 {
                     content = content.substring(0, content.length() - 2);
@@ -79,11 +103,10 @@ public class UploadServlet extends HttpServlet {
                 String[] headerLines = headerBlock.split("\r\n");
                 for(String hl : headerLines)
                 {
-                    String lower = hl.toLowerCase(java.util.Locale.ROOT);
+                    String lower = hl.toLowerCase(Locale.ROOT);
                     if(lower.startsWith("content-disposition:"))
                     {
                         disposition = hl;
-
                         int fnIdx = lower.indexOf("filename=");
                         if(fnIdx >= 0)
                         {
@@ -111,9 +134,8 @@ public class UploadServlet extends HttpServlet {
 
                 if(fileName != null && fieldName != null)
                 {
-                    originalName = new java.io.File(fileName).getName();
-                    filePayload = content.getBytes(
-                            java.nio.charset.StandardCharsets.ISO_8859_1);
+                    originalName = new File(fileName).getName();
+                    filePayload = content.getBytes(StandardCharsets.ISO_8859_1);
                 } else if("caption".equals(fieldName))
                 {
                     caption = content;
@@ -123,30 +145,30 @@ public class UploadServlet extends HttpServlet {
                 }
             }
 
+            File imagesDir = ensureImagesDir();
             String safeCaption = sanitizeForFileName(caption);
             String safeDate = sanitizeForFileName(date);
             String finalName = getFinalName(safeCaption, safeDate, originalName);
 
-            java.io.File outFile = new java.io.File(imagesDir, finalName);
+            File outFile = new File(imagesDir, finalName);
             if(filePayload != null)
             {
-                try(java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile))
+                try(FileOutputStream fos = new FileOutputStream(outFile))
                 {
                     fos.write(filePayload);
                 }
             }
 
             String html = buildImagesListingHtml(imagesDir);
-            response.getOutputStream()
-                    .write(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            response.getOutputStream().write(html.getBytes(StandardCharsets.UTF_8));
 
         } catch(Exception ex)
         {
             try
             {
                 response.getOutputStream().write(("<pre>" + ex + "</pre>").getBytes(
-                        java.nio.charset.StandardCharsets.UTF_8));
-            } catch(java.io.IOException ignored)
+                        StandardCharsets.UTF_8));
+            } catch(IOException ignored)
             {
             }
         }
@@ -157,12 +179,11 @@ public class UploadServlet extends HttpServlet {
         String fieldName = null;
         if(disposition != null)
         {
-            String lower = disposition.toLowerCase(java.util.Locale.ROOT);
+            String lower = disposition.toLowerCase(Locale.ROOT);
             int nameIdx = lower.indexOf("name=");
             if(nameIdx >= 0)
             {
-                String after =
-                        disposition.substring(nameIdx + "name=".length()).trim();
+                String after = disposition.substring(nameIdx + "name=".length()).trim();
                 if(after.startsWith("\""))
                 {
                     int end = after.indexOf("\"", 1);
@@ -182,32 +203,29 @@ public class UploadServlet extends HttpServlet {
         return fieldName;
     }
 
-    private static String getFinalName(String safeCaption, String safeDate,
-                                       String originalName)
+    private File ensureImagesDir()
     {
-        String prefix =
-                (safeCaption.isEmpty()
-                 ? ""
-                 : safeCaption + "_") +
-                        (safeDate.isEmpty()
-                         ? ""
-                         : safeDate + "_");
-        return (prefix.isEmpty()
-                ? ""
-                : prefix)
-                + (originalName != null
-                   ? originalName
-                   : "upload.bin");
-    }
-
-    private java.io.File checkImagesDir()
-    {
-        java.io.File dir = new java.io.File("images");
+        File dir = new File("images");
         if(!dir.exists())
         {
             dir.mkdirs();
         }
         return dir;
+    }
+
+    private static String getFinalName(String safeCaption, String safeDate,
+                                       String originalName)
+    {
+        String prefix = (safeCaption.isEmpty()
+                         ? ""
+                         : safeCaption + "_") + (safeDate.isEmpty()
+                                                 ? ""
+                                                 : safeDate + "_");
+        return (prefix.isEmpty()
+                ? ""
+                : prefix) + (originalName != null
+                             ? originalName
+                             : "upload.bin");
     }
 
     private String extractBoundary(String contentType)
@@ -216,7 +234,7 @@ public class UploadServlet extends HttpServlet {
         for(String t : tokens)
         {
             String s = t.trim();
-            if(s.toLowerCase(java.util.Locale.ROOT).startsWith("boundary="))
+            if(s.toLowerCase(Locale.ROOT).startsWith("boundary="))
             {
                 String b = s.substring("boundary=".length());
                 if(b.startsWith("\"") && b.endsWith("\""))
@@ -229,9 +247,9 @@ public class UploadServlet extends HttpServlet {
         return null;
     }
 
-    private byte[] readAllBytes(java.io.InputStream in) throws java.io.IOException
+    private byte[] readAllBytes(InputStream in) throws IOException
     {
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
         int n;
         while((n = in.read(buf)) != -1)
@@ -251,22 +269,34 @@ public class UploadServlet extends HttpServlet {
         return t.replaceAll("[^A-Za-z0-9._-]+", "_");
     }
 
-    private String buildImagesListingHtml(java.io.File imagesDir)
+    private String readFileUTF8(File f) throws IOException
     {
-        String[] names =
-                imagesDir.list((dir, name) -> new java.io.File(dir, name).isFile());
+        try(FileInputStream fis = new FileInputStream(f))
+        {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while((n = fis.read(buf)) != -1)
+            {
+                baos.write(buf, 0, n);
+            }
+            return baos.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    private String buildImagesListingHtml(File imagesDir)
+    {
+        String[] names = imagesDir.list((dir, name) -> new File(dir, name).isFile());
         if(names == null)
         {
             names = new String[0];
         }
-        java.util.Arrays.sort(names, java.lang.String.CASE_INSENSITIVE_ORDER);
+        Arrays.sort(names, String.CASE_INSENSITIVE_ORDER);
 
         StringBuilder html = new StringBuilder();
-        html.append(
-                "<!doctype html><html><head><meta " +
-                        "charset='utf-8'><title>Images</title></head><body>");
+        html.append("<!doctype html><html><head><meta " +
+                "charset='utf-8'><title>Images</title></head><body>");
         html.append("<h2>Images (alphabetical)</h2>");
-
         if(names.length == 0)
         {
             html.append("<p>No files in images/</p>");
@@ -282,59 +312,5 @@ public class UploadServlet extends HttpServlet {
         html.append("<hr><a href='/'>Back to form</a>");
         html.append("</body></html>");
         return html.toString();
-    }
-
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-    {
-        try
-        {
-            String html;
-            File form = new File("Form.html");
-            if(form.exists())
-            {
-                html = readFileUTF8(form);
-            } else
-            {
-                html =
-                        "<!doctype html><html><head><meta " +
-                                "charset='utf-8'><title>Upload</title></head><body>"
-                                + "<h2>File Upload</h2>"
-                                +
-                                "<form method='POST' action='/' " +
-                                "enctype='multipart/form-data'>"
-                                + "Caption: <input type='text' name='caption'><br/><br/>"
-                                + "Date: <input type='date' name='date'><br/>"
-                                + "File: <input type='file' name='fileName'><br/><br/>"
-                                + "<input type='submit' value='Submit'>"
-                                + "</form></body></html>";
-            }
-            response.getOutputStream()
-                    .write(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        } catch(Exception ex)
-        {
-            try
-            {
-                response.getOutputStream().write(("<pre>" + ex + "</pre>").getBytes(
-                        java.nio.charset.StandardCharsets.UTF_8));
-            } catch(IOException ignored)
-            {
-            }
-        }
-    }
-
-    private String readFileUTF8(File f) throws IOException
-    {
-        try(FileInputStream fis = new FileInputStream(f))
-        {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            byte[] buf = new byte[4096];
-            int n;
-            while((n = fis.read(buf)) != -1)
-            {
-                baos.write(buf, 0, n);
-            }
-            return baos.toString(StandardCharsets.UTF_8);
-        }
     }
 }

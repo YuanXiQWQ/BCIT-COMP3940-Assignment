@@ -3,7 +3,7 @@ import java.io.*;
 public class Activity {
     private String dirName = null;
 
-    public static void main(String[] args) throws IOException
+    public static void main(String[] args)
     {
         new Activity().onCreate();
     }
@@ -14,7 +14,7 @@ public class Activity {
 
     public void onCreate()
     {
-        AsyncTask UploadAsyncTask = new UploadAsyncTask().execute();
+        AsyncTask uploadAsyncTask = new UploadAsyncTask().execute();
         System.out.println("Waiting for Callback");
         try
         {
@@ -22,6 +22,7 @@ public class Activity {
             br.readLine();
         } catch(Exception e)
         {
+            throw new RuntimeException(e);
         }
     }
 }

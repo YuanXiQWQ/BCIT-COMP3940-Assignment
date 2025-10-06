@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class UploadServerThread extends Thread {
-    private Socket socket = null;
+    private final Socket socket;
 
     public UploadServerThread(Socket socket)
     {
@@ -17,19 +17,47 @@ public class UploadServerThread extends Thread {
     {
         try
         {
-            InputStream rawIn = socket.getInputStream();
-            BufferedInputStream bis = new BufferedInputStream(rawIn);
-            InputStreamReader isr =
-                    new InputStreamReader(bis, StandardCharsets.ISO_8859_1);
-            BufferedReader reader = new BufferedReader(isr);
+            socket.setSoTimeout(15000);
+            InputStream in = socket.getInputStream();
 
-            String requestLine = reader.readLine();
-            if(requestLine == null || requestLine.isEmpty())
+            ByteArrayOutputStream headerBuf = new ByteArrayOutputStream();
+            int state = 0;
+            while(true)
+            {
+                int b = in.read();
+                if(b == -1)
+                {
+                    break;
+                }
+                headerBuf.write(b);
+                if(state == 0 && b == '\r')
+                {
+                    state = 1;
+                } else if(state == 1 && b == '\n')
+                {
+                    state = 2;
+                } else if(state == 2 && b == '\r')
+                {
+                    state = 3;
+                } else if(state == 3 && b == '\n')
+                {
+                    break;
+                } else
+                {
+                    state = 0;
+                }
+            }
+
+            String headerText =
+                    headerBuf.toString(java.nio.charset.StandardCharsets.ISO_8859_1);
+            String[] headerLines = headerText.split("\r\n");
+            if(headerLines.length == 0)
             {
                 socket.close();
                 return;
             }
 
+            String requestLine = headerLines[0];
             String[] parts = requestLine.split(" ");
             String method = parts.length > 0
                             ? parts[0]
@@ -38,10 +66,14 @@ public class UploadServerThread extends Thread {
                          ? parts[1]
                          : "/";
 
-            Map<String, String> headers = new LinkedHashMap<>();
-            String line;
-            while((line = reader.readLine()) != null && line.length() > 0)
+            java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
+            for(int i = 1; i < headerLines.length; i++)
             {
+                String line = headerLines[i];
+                if(line.isEmpty())
+                {
+                    break;
+                }
                 int idx = line.indexOf(':');
                 if(idx > 0)
                 {
@@ -52,11 +84,8 @@ public class UploadServerThread extends Thread {
             }
 
             int contentLength = 0;
-            String cl = headers.get("Content-Length");
-            if(cl == null)
-            {
-                cl = headers.get("content-length");
-            }
+            String cl =
+                    headers.getOrDefault("Content-Length", headers.get("content-length"));
             if(cl != null)
             {
                 try
@@ -66,22 +95,21 @@ public class UploadServerThread extends Thread {
                 {
                 }
             }
-
             byte[] body = new byte[contentLength];
             int off = 0;
             while(off < contentLength)
             {
-                int n = bis.read(body, off, contentLength - off);
+                int n = in.read(body, off, contentLength - off);
                 if(n < 0)
                 {
                     break;
                 }
                 off += n;
             }
-            ByteArrayInputStream bodyIn = new ByteArrayInputStream(body);
+            java.io.ByteArrayInputStream bodyIn = new java.io.ByteArrayInputStream(body);
 
+            java.io.ByteArrayOutputStream bodyOut = new java.io.ByteArrayOutputStream();
             HttpServletRequest req = new HttpServletRequest(method, uri, headers, bodyIn);
-            ByteArrayOutputStream bodyOut = new ByteArrayOutputStream();
             HttpServletResponse res = new HttpServletResponse(bodyOut);
 
             HttpServlet httpServlet = new UploadServlet();
@@ -95,14 +123,13 @@ public class UploadServerThread extends Thread {
 
             byte[] responseBody = bodyOut.toByteArray();
             String status = "HTTP/1.1 200 OK\r\n";
-            String contentType = "text/html; charset=UTF-8";
             String respHeaders =
-                    "Content-Type: " + contentType + "\r\n" + "Content-Length: " +
+                    "Content-Type: text/html; charset=UTF-8\r\n" + "Content-Length: " +
                             responseBody.length + "\r\n" + "Connection: close\r\n\r\n";
 
             OutputStream out = socket.getOutputStream();
-            out.write(status.getBytes(StandardCharsets.ISO_8859_1));
-            out.write(respHeaders.getBytes(StandardCharsets.ISO_8859_1));
+            out.write(status.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+            out.write(respHeaders.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
             out.write(responseBody);
             out.flush();
             socket.close();

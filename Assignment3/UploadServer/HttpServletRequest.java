@@ -7,9 +7,7 @@ public class HttpServletRequest {
     private final Map<String, String> headers;
     private final InputStream inputStream;
 
-    public HttpServletRequest(String method,
-                              String uri,
-                              Map<String, String> headers,
+    public HttpServletRequest(String method, String uri, Map<String, String> headers,
                               InputStream inputStream)
     {
         this.method = method;
