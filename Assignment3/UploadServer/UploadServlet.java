@@ -10,7 +10,7 @@ public class UploadServlet extends HttpServlet {
     {
         try
         {
-            File imagesDir = ensureImagesDir();
+            File imagesDir = checkImagesDir();
 
             String contentType = request.getHeader("content-type");
             if(contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT)
@@ -136,14 +136,7 @@ public class UploadServlet extends HttpServlet {
                 }
             }
 
-            String html =
-                    "<!doctype html><html><head><meta " +
-                            "charset='utf-8'><title>Uploaded</title></head><body>"
-                            + "<h3>Upload OK</h3>"
-                            + "<p>Saved as: <b>" + outFile.getName() + "</b></p>"
-                            + "<p><a href='/'>Back to form</a></p>"
-                            + "</body></html>";
-
+            String html = buildImagesListingHtml(imagesDir);
             response.getOutputStream()
                     .write(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
@@ -207,7 +200,7 @@ public class UploadServlet extends HttpServlet {
                    : "upload.bin");
     }
 
-    private java.io.File ensureImagesDir()
+    private java.io.File checkImagesDir()
     {
         java.io.File dir = new java.io.File("images");
         if(!dir.exists())
@@ -256,6 +249,39 @@ public class UploadServlet extends HttpServlet {
         }
         String t = s.trim();
         return t.replaceAll("[^A-Za-z0-9._-]+", "_");
+    }
+
+    private String buildImagesListingHtml(java.io.File imagesDir)
+    {
+        String[] names =
+                imagesDir.list((dir, name) -> new java.io.File(dir, name).isFile());
+        if(names == null)
+        {
+            names = new String[0];
+        }
+        java.util.Arrays.sort(names, java.lang.String.CASE_INSENSITIVE_ORDER);
+
+        StringBuilder html = new StringBuilder();
+        html.append(
+                "<!doctype html><html><head><meta " +
+                        "charset='utf-8'><title>Images</title></head><body>");
+        html.append("<h2>Images (alphabetical)</h2>");
+
+        if(names.length == 0)
+        {
+            html.append("<p>No files in images/</p>");
+        } else
+        {
+            html.append("<ul>");
+            for(String n : names)
+            {
+                html.append("<li>").append(n).append("</li>");
+            }
+            html.append("</ul>");
+        }
+        html.append("<hr><a href='/'>Back to form</a>");
+        html.append("</body></html>");
+        return html.toString();
     }
 
     @Override
