@@ -113,16 +113,31 @@ public class UploadServerThread extends Thread {
             HttpServletResponse res = new HttpServletResponse(bodyOut);
 
             HttpServlet httpServlet = new UploadServlet();
-            if("GET".equalsIgnoreCase(method))
+
+            String status;
+            byte[] responseBody;
+            try
             {
-                httpServlet.doGet(req, res);
-            } else
+                RequestHandler handler = LoggingProxy.wrap(HandlerFactory.create(method));
+                handler.handle(httpServlet, req, res);
+
+                responseBody = bodyOut.toByteArray();
+                status = "HTTP/1.1 200 OK\r\n";
+            } catch(BadRequestException | MultipartParseException e)
             {
-                httpServlet.doPost(req, res);
+                String html = "<!doctype html><meta charset='utf-8'><title>400</title>" +
+                        "<body><h3>Bad Request</h3><pre>" + e.getMessage() +
+                        "</pre></body>";
+                responseBody = html.getBytes(StandardCharsets.UTF_8);
+                status = "HTTP/1.1 400 Bad Request\r\n";
+            } catch(Exception e)
+            {
+                String html = "<!doctype html><meta charset='utf-8'><title>500</title>" +
+                        "<body><h3>Internal Server Error</h3><pre>" + e + "</pre></body>";
+                responseBody = html.getBytes(StandardCharsets.UTF_8);
+                status = "HTTP/1.1 500 Internal Server Error\r\n";
             }
 
-            byte[] responseBody = bodyOut.toByteArray();
-            String status = "HTTP/1.1 200 OK\r\n";
             String respHeaders =
                     "Content-Type: text/html; charset=UTF-8\r\n" + "Content-Length: " +
                             responseBody.length + "\r\n" + "Connection: close\r\n\r\n";
@@ -136,9 +151,6 @@ public class UploadServerThread extends Thread {
         } catch(Exception e)
         {
             e.printStackTrace();
-        } finally
-        {
-            UploadServer.CONNECTION_SEM.release();
         }
     }
 }

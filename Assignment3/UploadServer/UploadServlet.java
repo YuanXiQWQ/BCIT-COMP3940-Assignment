@@ -2,6 +2,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class UploadServlet extends HttpServlet {
 
@@ -29,13 +30,7 @@ public class UploadServlet extends HttpServlet {
             response.getOutputStream().write(html.getBytes(StandardCharsets.UTF_8));
         } catch(Exception ex)
         {
-            try
-            {
-                response.getOutputStream().write(("<pre>" + ex + "</pre>").getBytes(
-                        StandardCharsets.UTF_8));
-            } catch(IOException ignored)
-            {
-            }
+            safeWriteError(response, ex);
         }
     }
 
@@ -48,18 +43,13 @@ public class UploadServlet extends HttpServlet {
             if(contentType == null || !contentType.toLowerCase(Locale.ROOT)
                     .startsWith("multipart/form-data"))
             {
-                String msg = "<!doctype html><meta charset='utf-8'><body>Unsupported " +
-                        "Content-Type</body>";
-                response.getOutputStream().write(msg.getBytes(StandardCharsets.UTF_8));
-                return;
+                throw new BadRequestException("Unsupported Content-Type: " + contentType);
             }
+
             String boundary = extractBoundary(contentType);
             if(boundary == null)
             {
-                String msg = "<!doctype html><meta charset='utf-8'><body>Boundary not " +
-                        "found</body>";
-                response.getOutputStream().write(msg.getBytes(StandardCharsets.UTF_8));
-                return;
+                throw new BadRequestException("Boundary not found");
             }
 
             byte[] bodyBytes = readAllBytes(request.getInputStream());
@@ -87,7 +77,7 @@ public class UploadServlet extends HttpServlet {
                 int headerEnd = part.indexOf("\r\n\r\n");
                 if(headerEnd < 0)
                 {
-                    continue;
+                    throw new MultipartParseException("Malformed part: missing CRLFCRLF");
                 }
 
                 String headerBlock = part.substring(0, headerEnd);
@@ -150,9 +140,9 @@ public class UploadServlet extends HttpServlet {
             String safeDate = sanitizeForFileName(date);
             String finalName = getFinalName(safeCaption, safeDate, originalName);
 
-            File outFile = new File(imagesDir, finalName);
             if(filePayload != null)
             {
+                File outFile = new File(imagesDir, finalName);
                 try(FileOutputStream fos = new FileOutputStream(outFile))
                 {
                     fos.write(filePayload);
@@ -164,13 +154,19 @@ public class UploadServlet extends HttpServlet {
 
         } catch(Exception ex)
         {
-            try
-            {
-                response.getOutputStream().write(("<pre>" + ex + "</pre>").getBytes(
-                        StandardCharsets.UTF_8));
-            } catch(IOException ignored)
-            {
-            }
+            safeWriteError(response, ex);
+        }
+    }
+
+    private static void safeWriteError(HttpServletResponse response, Exception ex)
+    {
+        try
+        {
+            response.getOutputStream()
+                    .write(("<!doctype html><meta charset='utf-8'><pre>" + ex +
+                            "</pre>").getBytes(StandardCharsets.UTF_8));
+        } catch(IOException ignored)
+        {
         }
     }
 
@@ -286,18 +282,18 @@ public class UploadServlet extends HttpServlet {
 
     private String buildImagesListingHtml(File imagesDir)
     {
-        String[] names = imagesDir.list((dir, name) -> new File(dir, name).isFile());
-        if(names == null)
-        {
-            names = new String[0];
-        }
-        Arrays.sort(names, String.CASE_INSENSITIVE_ORDER);
+        File[] files = imagesDir.listFiles(File::isFile);
+        List<String> names = files == null
+                             ? Collections.emptyList()
+                             : Arrays.stream(files).map(File::getName)
+                                     .sorted(String.CASE_INSENSITIVE_ORDER)
+                                     .collect(Collectors.toList());
 
         StringBuilder html = new StringBuilder();
         html.append("<!doctype html><html><head><meta " +
                 "charset='utf-8'><title>Images</title></head><body>");
         html.append("<h2>Images (alphabetical)</h2>");
-        if(names.length == 0)
+        if(names.isEmpty())
         {
             html.append("<p>No files in images/</p>");
         } else

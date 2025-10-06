@@ -1,33 +1,24 @@
 import java.net.*;
 import java.io.*;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.*;
 
 public class UploadServer {
-    static final Semaphore CONNECTION_SEM = new Semaphore(3, true);
+    private static final ExecutorService POOL = Executors.newFixedThreadPool(3);
+
     public static void main(String[] args) throws IOException
     {
-        ServerSocket serverSocket = null;
-        try
+        try(ServerSocket serverSocket = new ServerSocket(8082))
         {
-            serverSocket = new ServerSocket(8082);
-        } catch(IOException e)
-        {
-            System.err.println("Could not listen on port: 8082.");
-            System.exit(-1);
-        }
-        while(true)
-        {
-            try {
-                CONNECTION_SEM.acquire();
-                try {
-                    Socket socket = serverSocket.accept();
-                    new UploadServerThread(socket).start();
-                } catch (Exception e) {
-                    CONNECTION_SEM.release();
-                    throw e;
-                }
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
+            System.out.println("Listening on 8082...");
+            Runtime.getRuntime().addShutdownHook(new Thread(() ->
+            {
+                System.out.println("Shutting down thread pool...");
+                POOL.shutdown();
+            }));
+            while(true)
+            {
+                Socket socket = serverSocket.accept();
+                POOL.submit(new UploadServerThread(socket));
             }
         }
     }
