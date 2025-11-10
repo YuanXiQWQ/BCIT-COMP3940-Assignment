@@ -6,88 +6,101 @@ import java.io.*;
 
 public class PlayServlet extends HttpServlet {
     private static final String JDBC_URL =
-            "jdbc:mysql://localhost:3306/testdb?useSSL=false&serverTimezone=UTC";
-    private static final String JDBC_USER = "root";
-    private static final String JDBC_PASS = "YOUR_PASSWORD";
+            "jdbc:mysql://localhost:3306/comp3940assignment1?useSSL=false" +
+                    "&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+    private static final String JDBC_USER = "test";
+    private static final String JDBC_PASS = "123123";
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException
+            throws IOException
     {
-        response.setContentType("text/html; charset=UTF-8");
+        String errMsg = "";
+        String nav = request.getParameter("nav");
+
         HttpSession session = request.getSession(true);
+        Integer idxObj = (Integer) session.getAttribute("VIDEO_IDX");
+        int idx = (idxObj == null)
+                  ? 0
+                  : idxObj;
 
-        // Use session to record current video index (0-based)
-        Integer idx = (Integer) session.getAttribute("VID_IDX");
-        if(idx == null)
-        {
-            idx = 0;
-        }
+        String contentPath = "tgbNymZ7vqY";
 
-        // Move index based on button click
-        if(request.getParameter("prev") != null && idx > 0)
+        Connection con;
+        try
         {
-            idx--;
-        } else if(request.getParameter("next") != null)
-        {
-            idx++;
-        }
-
-        // Get video URL from database
-        String videoUrl = null;
-        try(Connection con = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASS))
-        {
-            try(PreparedStatement ps = con.prepareStatement(
-                    "SELECT url FROM videos ORDER BY id LIMIT 1 OFFSET ?"))
+            try
             {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+            } catch(Exception ex)
+            {
+            }
+            con = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASS);
+
+            int total = 0;
+            Statement stmtCount = con.createStatement();
+            ResultSet rsc = stmtCount.executeQuery("SELECT COUNT(*) FROM videos");
+            if(rsc.next())
+            {
+                total = rsc.getInt(1);
+            }
+            rsc.close();
+            stmtCount.close();
+
+            if(total > 0)
+            {
+                if("next".equals(nav))
+                {
+                    idx = (idx + 1) % total;
+                } else if("prev".equals(nav))
+                {
+                    idx = (idx - 1 + total) % total;
+                }
+                session.setAttribute("VIDEO_IDX", idx);
+
+                String sql = "SELECT url FROM videos ORDER BY id LIMIT ?,1";
+                PreparedStatement ps = con.prepareStatement(sql);
                 ps.setInt(1, idx);
-                try(ResultSet rs = ps.executeQuery())
+                ResultSet rs = ps.executeQuery();
+                if(rs.next())
                 {
-                    if(rs.next())
-                    {
-                        videoUrl = rs.getString(1);
-                    }
+                    contentPath = rs.getString("url");
                 }
+                rs.close();
+                ps.close();
             }
-            if(videoUrl == null)
-            {
-                idx = 0;
-                try(PreparedStatement ps0 = con.prepareStatement(
-                        "SELECT url FROM videos ORDER BY id LIMIT 1 OFFSET 0");
-                    ResultSet rs0 = ps0.executeQuery())
-                {
-                    if(rs0.next())
-                    {
-                        videoUrl = rs0.getString(1);
-                    }
-                }
-            }
-        } catch(SQLException e)
+            con.close();
+        } catch(SQLException ex)
         {
-            // Never! Gonna! Give! You! Up!
-            videoUrl = "https://youtu.be/dQw4w9WgXcQ?si=959xB4npzjgrNRtK";
+            errMsg = errMsg + "\n--- SQLException caught ---\n";
+            while(ex != null)
+            {
+                errMsg += "Message: " + ex.getMessage();
+                errMsg += "SQLState: " + ex.getSQLState();
+                errMsg += "ErrorCode: " + ex.getErrorCode();
+                ex = ex.getNextException();
+                errMsg += "";
+            }
         }
 
-        session.setAttribute("VID_IDX", idx);
-
+        response.setContentType("text/html");
         PrintWriter out = response.getWriter();
         out.println(
                 "<!DOCTYPE html>" +
-                        "<html>" +
                         "<meta charset='UTF-8'>" +
                         "<body>" +
                         "<div>" +
                         "<iframe id=\"Video\" width=\"420\" height=\"345\" " +
-                        "src=" + videoUrl +
-                        ">" +
+                        "src=https://www.youtube.com/embed/" +
+                        contentPath + "?autoplay=1&mute=1&start=62&end=162>" +
                         "</iframe>" +
                         "</div>" +
                         "<div>" +
                         "<form action='/trivia/play' method='GET'>" +
                         "<br>" +
                         "<div class='button'>" +
-                        "<button class='button' id='prev' name='prev'>Prev</button>" +
-                        "<button class='button' id='next' name='next'>Next</button>" +
+                        "<button class='button' id='prev' name='nav' value='prev'>Prev</button>" +
+                        "<button class='button' id='next' name='nav' value='next'>Next</button>" +
                         "</div>" +
                         "<br>" +
                         "</form>" +
