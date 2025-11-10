@@ -6,13 +6,14 @@ import java.io.*;
 
 public class LoginServlet extends HttpServlet {
     private static final String JDBC_URL =
-            "jdbc:mysql://localhost:3306/testdb?useSSL=false&serverTimezone=UTC";
-    private static final String JDBC_USER = "root";
-    private static final String JDBC_PASS = "your_password";
+            "jdbc:mysql://localhost:3306/comp3940assignment1?useSSL=false" +
+                    "&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+    private static final String JDBC_USER = "test";
+    private static final String JDBC_PASS = "123123";
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException
+            throws IOException
     {
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
@@ -26,8 +27,7 @@ public class LoginServlet extends HttpServlet {
                 + "Username: <input type=\"text\" name=\"user_id\">\n" + "<br />\n"
                 + "Password: <input type=\"password\" name=\"password\" id=\"pswd\"/>\n" +
                 "<br />\n"
-                + "<input type=\"submit\" value=\"Sign in\"  />\n" + "</form>\n"
-                + "</form>\n" +
+                + "<input type=\"submit\" value=\"Sign in\"  />\n" + "</form>\n" +
                 "<script>" +
                 "function handleLogin() {" +
                 "var password = document.getElementById(\"pswd\").value;" +
@@ -37,39 +37,67 @@ public class LoginServlet extends HttpServlet {
                 "document.getElementById(\"pswd\").value = hash;" +
                 "}" +
                 "</script>" +
-                "</body>\n</html\n"
+                "</body>\n</html>\n"
         );
     }
 
     @Override
     public void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException
+            throws IOException
     {
-        request.setCharacterEncoding("UTF-8");
+        System.out.println(">>Enetring Do Post\n\n");
+        response.setContentType("text/html");
+        String errMsg = "";
+        Connection con;
 
-        String username = request.getParameter("user_id");
-        String password = request.getParameter("password");
 
-        boolean ok = false;
-        try(Connection conn = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASS);
-            PreparedStatement ps = conn.prepareStatement(
-                    "SELECT 1 FROM accounts WHERE username=? AND password=?"))
+        String userId = request.getParameter("user_id");
+        String plainOrHashedPwd = request.getParameter("password");
+
+        boolean authOk = false;
+
+        try
         {
-            ps.setString(1, username);
-            ps.setString(2, password);
-            try(ResultSet rs = ps.executeQuery())
+            try
             {
-                ok = rs.next();
+                Class.forName("com.mysql.cj.jdbc.Driver");
+            } catch(Exception ex)
+            {
+                System.out.println(">>Driver Exception\n\n");
             }
-        } catch(SQLException e)
+            con = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASS);
+
+            System.out.println("user_id=" + userId + ", pwd=" + plainOrHashedPwd);
+            String sql = "SELECT 1 FROM accounts WHERE userid = ? AND password = ?";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setString(1, userId);
+            ps.setString(2, plainOrHashedPwd);
+
+            ResultSet rs = ps.executeQuery();
+            authOk = rs.next();
+            rs.close();
+            ps.close();
+            con.close();
+            System.out.println("\n\n");
+        } catch(SQLException ex)
         {
-            ok = false;
+            errMsg = errMsg + "\n--- SQLException caught ---\n";
+            while(ex != null)
+            {
+                errMsg += "Message: " + ex.getMessage();
+                errMsg += "SQLState: " + ex.getSQLState();
+                errMsg += "ErrorCode: " + ex.getErrorCode();
+                ex = ex.getNextException();
+                errMsg += "";
+            }
+            System.out.println(errMsg);
+
         }
 
-        if(ok)
+        if(authOk)
         {
             HttpSession session = request.getSession(true);
-            session.setAttribute("USER_ID", username);
+            session.setAttribute("USER_ID", userId);
             response.sendRedirect("main");
         } else
         {
