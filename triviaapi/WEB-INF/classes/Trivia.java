@@ -21,7 +21,7 @@ import java.util.regex.Matcher;
 public class Trivia extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException
+            throws IOException
     {
         HttpSession session = request.getSession(false);
         boolean isLoggedIn = isLoggedIn(request);
@@ -37,47 +37,16 @@ public class Trivia extends HttpServlet {
             // request
             System.out.println(request.getPathInfo());
             System.out.println(request.getParameterMap());
-            String op = request.getParameter("op");
-            if ("one".equals(op)) {
-                // Get a image from the images directory
-                String imagesDir = getServletContext().getRealPath("/images");
-                File dir = new File(imagesDir);
-                String url = "";
-
-                if (dir.exists() && dir.isDirectory()) {
-                    File[] files = dir.listFiles();
-                    if (files != null) {
-                        for (File f : files) {
-                            if (f.isFile() && !f.isHidden()) {
-                                url = request.getContextPath() + "/images/" + f.getName();
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Return the image path
-                response.setContentType("text/plain; charset=UTF-8");
-                PrintWriter out = response.getWriter();
-                out.print(url);
-                return;
-            }
             //use the resource Values to find out the details of the request and
             // respond accordingly
-            File dir = new File("c:\\tomcat\\webapps\\triviaapi\\images");
+            File dir = new File(
+                    System.getProperty("catalina.base") + "/webapps/triviaapi/images");
             String[] fileList = dir.list();
             //use jason-io or Gson as opposed to buildng your own json array.
             if(fileList != null && fileList.length > 0)
             {
-                String jsonArray = "[";
-                for(int i = 0; i < fileList.length; i++)
-                {
-                    jsonArray += fileList[i];
-                    jsonArray += ",";
-                }
-                jsonArray += "]";
                 PrintWriter out = response.getWriter();
-                out.println(jsonArray);
+                out.print("/triviaapi/images/" + fileList[0]);
             }
             response.setStatus(200);
         }
@@ -85,7 +54,6 @@ public class Trivia extends HttpServlet {
 
     @Override
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException
     {
         //Use the path info and parameter map to find out the details of the PUT request
         System.out.println(request.getPathInfo());
@@ -95,7 +63,6 @@ public class Trivia extends HttpServlet {
 
     @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException
     {
         //Use the path info and parameter map to find out the details of the DELETE
         // request
@@ -114,17 +81,17 @@ public class Trivia extends HttpServlet {
         String formDate = request.getParameter("date");
         String fileName = filePart.getSubmittedFileName();
 
-        if(fileName.equals(""))
+        if(fileName.isEmpty())
         {
             response.setStatus(302);
             response.sendRedirect("upload");
             return;
         }
-        if(formDate.equals(""))
+        if(formDate.isEmpty())
         {
             formDate = "2020-10-10";
         }
-        if(captionName.equals(""))
+        if(captionName.isEmpty())
         {
             captionName = "No caption";
         }
@@ -137,13 +104,7 @@ public class Trivia extends HttpServlet {
     private boolean isLoggedIn(HttpServletRequest req)
     {
         HttpSession session = req.getSession(false);
-        if(session == null || !req.isRequestedSessionIdValid())
-        {
-            return false;
-        } else
-        {
-            return true;
-        }
+        return session != null && req.isRequestedSessionIdValid();
     }
 
 }

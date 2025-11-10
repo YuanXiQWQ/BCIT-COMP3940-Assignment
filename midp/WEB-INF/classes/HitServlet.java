@@ -8,9 +8,9 @@ public class HitServlet extends HttpServlet {
   public void doGet(HttpServletRequest request,
       HttpServletResponse response)
       throws ServletException, IOException {
-    String message = "Hits: " + ++mCount + " :" + request.getHeader("User-Agent");
+      String message = "Hits: " + ++mCount + "." + request.getHeader("User-Agent");
 
-    response.setContentType("text/plain");
+      response.setContentType("text/plain");
     response.setContentLength(message.length());
     PrintWriter out = response.getWriter();
     out.println(message);
